@@ -159,6 +159,7 @@ void addIncident()
 
 }
 
+// this function is used to view all incidents
 void viewIncidents()
 {
     FILE *fp;
