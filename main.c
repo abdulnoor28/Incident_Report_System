@@ -4,6 +4,7 @@
 #include<time.h>
 
 struct Incident{
+    int id;
     char title[200];
     char description[1000];
     char reportedBy[100];
@@ -30,20 +31,21 @@ void incident_severity(FILE *fp){
     else {
         switch(severity) {
             case 1:
-                fprintf(fp,"Severity set to Low.\n");
-                break;
+                fprintf(fp,"severity: critical\n");
+                break; 
             case 2:
-                fprintf(fp,"Severity set to Medium.\n");
+                fprintf(fp,"severity: high\n");
                 break;
             case 3:
-                fprintf(fp,"Severity set to High.\n");
+                fprintf(fp,"severity: medium\n");
                 break;
             case 4:
-                fprintf(fp,"Severity set to Critical.\n");
+                fprintf(fp,"severity: low\n");
                 break;
         }
     }
 }
+
 
 void status(FILE *fp){
     int status_choice;
@@ -111,16 +113,49 @@ void incident_severity_and_status(struct Incident *incident) {
         strcpy(incident->status, "Unknown");
 }
 
+
+int getseverity(const char *severity)
+{
+    if(strcmp(severity,"Critical")==0)
+    return 1;
+    else if(strcmp(severity,"High")==0)
+    return 2;
+    else if(strcmp(severity,"Medium")==0)
+    return 3;
+    else if(strcmp(severity,"Low")==0)
+    return 4;
+    else
+    return 5;
+}
+
+int get_next_id() {
+    FILE *fp = fopen("incidents.txt", "r");
+    if (fp == NULL) return 1; // First incident
+    char line[500];
+    int last_id = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        if (strncmp(line, "ID:", 3) == 0) {
+            int id;
+            sscanf(line, "ID: %d", &id);
+            if (id > last_id) last_id = id;
+        }
+    }
+    fclose(fp);
+    return last_id + 1;
+}
+
 void addIncident()
 {
     struct Incident newIncident;
     FILE *fp;
     fp = fopen("incidents.txt", "a");
+    int Id=1;
     if(fp == NULL)
     {
         printf("Error opening file\n");
         return;
     }
+    newIncident.id=get_next_id();
     printf("Enter title: ");
     scanf("%[^\n]", newIncident.title);
     printf("Enter description: ");
@@ -134,6 +169,7 @@ void addIncident()
     printf("Enter category: ");
     scanf(" %[^\n]", newIncident.category); // Clear the newline character from the input buffer
 
+    fprintf(fp,"ID: %d\n",newIncident.id);
     fprintf(fp, "Date & time: %s\n", newIncident.datetime);
     fprintf(fp, "Title: %s\n", newIncident.title);
     fprintf(fp, "Description: %s\n", newIncident.description);
@@ -159,31 +195,126 @@ void addIncident()
 
 }
 
-// this function is used to view all incidents
-void viewIncidents()
-{
+void sort_incidents_by_severity(struct Incident incidents[],int count) {
+
+    for (int i = 0; i < count - 1; i++) {
+        for (int j = 0; j < count - i - 1; j++) {
+            int rank1 = getseverity(incidents[j].severity);
+            int rank2 = getseverity(incidents[j + 1].severity);
+
+            if (rank1 > rank2) {
+                // Swap the two incidents
+                struct Incident temp = incidents[j];
+                incidents[j] = incidents[j + 1];
+                incidents[j + 1] = temp;
+            }
+        }
+    }
+}
+int load_incidents(struct Incident incidents[]) {
+    FILE *file = fopen("incidents.txt", "r");
+    if (file == NULL) {
+        printf("Error: Could not open incidents.txt\n");
+        return 0;
+    }
+
+    int count = 0;
+    char buffer[1000];
+    while (fgets(buffer, sizeof(buffer), file)) {
+        if (strncmp(buffer, "Date & time:", 12) == 0)
+            sscanf(buffer, "Date & time: %[^\n]", incidents[count].datetime);
+        if (fgets(buffer, sizeof(buffer), file))
+            sscanf(buffer, "Title: %[^\n]", incidents[count].title);
+        if (fgets(buffer, sizeof(buffer), file))
+            sscanf(buffer, "Description: %[^\n]", incidents[count].description);
+        if (fgets(buffer, sizeof(buffer), file))
+            sscanf(buffer, "Reported By: %[^\n]", incidents[count].reportedBy);
+        if (fgets(buffer, sizeof(buffer), file))
+            sscanf(buffer, "Category: %[^\n]", incidents[count].category);
+        if (fgets(buffer, sizeof(buffer), file))
+            sscanf(buffer, "Severity: %[^\n]", incidents[count].severity);
+        if (fgets(buffer, sizeof(buffer), file))
+            sscanf(buffer, "Status: %[^\n]", incidents[count].status);
+        // Skip blank line between incidents
+        fgets(buffer, sizeof(buffer), file);
+        count++;
+    }
+    fclose(file);
+    return count;
+}
+void view_all_incident_normally(){
+
     FILE *fp;
-    char line[100];
-    fp=fopen("incidents.txt", "r");
+    fp=fopen("incidents.txt","r");
+    char line[500];
     if(fp == NULL)
     {
         printf("Error opening file\n");
-        return;
+            return;
     }
     printf("\nIncident Report:\n");
     while(fgets(line, sizeof(line), fp)!= NULL)
-    {
-        printf("%s", line);
-    }
+        {
+            printf("%s", line);
+        }
     fclose(fp);
     printf("\n");
+}
+
+void view_incidents_according_to_severity(){
+    struct Incident incidents[100];
+    int count=load_incidents(incidents);
+
+    sort_incidents_by_severity(incidents,count);
+
+    for(int i = 0; i < count; i++) {
+        printf("Date & time: %s\n", incidents[i].datetime);
+        printf("Title: %s\n", incidents[i].title);
+        printf("Description: %s\n", incidents[i].description);
+        printf("Reported By: %s\n", incidents[i].reportedBy);
+        printf("Category: %s\n", incidents[i].category);
+        printf("Severity: %s\n", incidents[i].severity);
+        printf("Status: %s\n", incidents[i].status);
+        printf("\n");
+}
+}
+
+// this function is used to view all incidents
+void viewIncidents()
+{
+    int ch;
+    while(1)
+    {
+        printf("\n1.View all incidents in original order.\n");
+        printf("2.View incidents sorted by severity.\n");
+        // printf("2.View incidents sorted by date and time.\n");
+        printf("4.Exit\n");
+
+        printf("enter your choice:");
+        scanf("%d",&ch);
+        switch(ch)
+        {
+            case 1:
+            view_all_incident_normally();
+            break;
+            case 2:
+            view_incidents_according_to_severity();
+            break;
+
+            case 3:
+            return;
+            default:
+            printf("invalid number.");
+
+        }
+    }
 
 }
 void search_keywords()
 {
     char keyword[50];
     printf("\nEnter keyword to search: ");
-    scanf("%s",keyword);
+    scanf("%[^\n]",keyword);
     FILE *fp;
     fp=fopen("incidents.txt", "r");
     if(fp == NULL)
@@ -191,7 +322,7 @@ void search_keywords()
         printf("Error opening file\n");
         return;
     }
-    char line[100];
+    char line[1000];
     int found = 0,linenumber = 0;
     while(fgets(line, sizeof(line), fp) != NULL)
     {
