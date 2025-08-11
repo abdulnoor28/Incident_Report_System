@@ -4,7 +4,7 @@
 #include<time.h>
 
 struct Incident{
-    int id;
+    char id[10]; // Unique ID for the incident
     char title[200];
     char description[1000];
     char reportedBy[100];
@@ -144,9 +144,34 @@ int get_next_id() {
     return last_id + 1;
 }
 
+int id_exists_in_file(const char *id) {
+    FILE *file = fopen("incidents.txt", "r");
+    if (!file) return 0; // file doesn't exist yet, so ID is unique
+
+    char line[256];
+    while (fgets(line, sizeof(line), file)) {
+        if (strstr(line, id)) { // ID found in file
+            fclose(file);
+            return 1;
+        }
+    }
+
+    fclose(file);
+    return 0;
+}
+
+void generate_unique_id(char *id_buffer) {
+    do {
+        int random_id = 100000 + rand() % 900000; // ensures 6 digits
+        sprintf(id_buffer, "%d", random_id);
+    } while (id_exists_in_file(id_buffer));
+}
+
+
 void addIncident()
 {
     struct Incident newIncident;
+    generate_unique_id(newIncident.id);
     FILE *fp;
     fp = fopen("incidents.txt", "a");
     int Id=1;
@@ -155,11 +180,11 @@ void addIncident()
         printf("Error opening file\n");
         return;
     }
-    newIncident.id=get_next_id();
+    // newIncident.id=get_next_id();
     printf("Enter title: ");
     scanf("%[^\n]", newIncident.title);
     printf("Enter description: ");
-    scanf(" %[^\n]", newIncident.description);
+    scanf(" %[^\n]", newIncident.description); 
     getchar();
     time_t now=time(NULL);
     struct tm *t = localtime(&now);
@@ -169,7 +194,7 @@ void addIncident()
     printf("Enter category: ");
     scanf(" %[^\n]", newIncident.category); // Clear the newline character from the input buffer
 
-    fprintf(fp,"ID: %d\n",newIncident.id);
+    fprintf(fp,"ID: %s\n",newIncident.id);
     fprintf(fp, "Date & time: %s\n", newIncident.datetime);
     fprintf(fp, "Title: %s\n", newIncident.title);
     fprintf(fp, "Description: %s\n", newIncident.description);
@@ -185,6 +210,7 @@ void addIncident()
 
     printf("\n");
     printf("Incident details:\n\n");
+    printf("ID: %s\n", newIncident.id);
     printf("Date & time: %s\n",newIncident.datetime);
     printf("Title: %s\n", newIncident.title);
     printf("Description: %s\n", newIncident.description);
@@ -246,6 +272,15 @@ void view_all_incident_normally(){
 
     FILE *fp;
     fp=fopen("incidents.txt","r");
+
+    fseek(fp, 0, SEEK_END);
+    if (ftell(fp) == 0) {
+    printf("There are no incidents reported till now.\n");
+    fclose(fp);
+    return;
+    }
+    rewind(fp);
+
     char line[500];
     if(fp == NULL)
     {
@@ -259,11 +294,15 @@ void view_all_incident_normally(){
         }
     fclose(fp);
     printf("\n");
-}
-
+    }
 void view_incidents_according_to_severity(){
     struct Incident incidents[100];
     int count=load_incidents(incidents);
+
+    if (count == 0) {
+    printf("There are no incidents reported till now.\n");
+    return;
+    }
 
     sort_incidents_by_severity(incidents,count);
 
@@ -279,6 +318,64 @@ void view_incidents_according_to_severity(){
 }
 }
 
+void view_incidents_from_date() {
+    char startDateTime[40];
+    printf("Enter start date & time (YYYY-MM-DD HH:MM:SS): ");
+    scanf(" %[^\n]", startDateTime);
+
+    struct tm start_tm = {0};
+    sscanf(startDateTime, "%d-%d-%d %d:%d:%d",
+    &start_tm.tm_year, &start_tm.tm_mon, &start_tm.tm_mday,
+    &start_tm.tm_hour, &start_tm.tm_min, &start_tm.tm_sec);
+
+start_tm.tm_year -= 1900; // struct tm counts years since 1900
+start_tm.tm_mon  -= 1;    // struct tm months are 0–11
+
+    time_t start_time = mktime(&start_tm);
+
+    FILE *fp = fopen("incidents.txt", "r");
+    if (!fp) {
+        printf("Error opening file\n");
+        return;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    if (ftell(fp) == 0) {
+    printf("There are no incidents reported till now.\n");
+    fclose(fp);
+    return;
+    }
+    rewind(fp);
+
+    char line[500];
+    struct Incident tempIncident;
+    int printIncident = 0;
+
+    while (fgets(line, sizeof(line), fp)) {
+        if (strncmp(line, "Date & time:", 12) == 0) {
+            sscanf(line, "Date & time: %[^\n]", tempIncident.datetime);
+
+            struct tm incident_tm = {0};
+            sscanf(tempIncident.datetime, "%d-%d-%d %d:%d:%d",&incident_tm.tm_year, &incident_tm.tm_mon, &incident_tm.tm_mday,&incident_tm.tm_hour, &incident_tm.tm_min, &incident_tm.tm_sec);
+
+incident_tm.tm_year -= 1900; // struct tm years since 1900
+incident_tm.tm_mon  -= 1;    // struct tm months are 0-11
+
+time_t incident_time = mktime(&incident_tm);
+
+
+            printIncident = (difftime(incident_time, start_time) >= 0);
+            printf("\n"); // Separate incidents
+        }
+
+        if (printIncident) {
+            printf("%s", line);
+        }
+    }
+
+    fclose(fp);
+}
+
 // this function is used to view all incidents
 void viewIncidents()
 {
@@ -287,24 +384,28 @@ void viewIncidents()
     {
         printf("\n1.View all incidents in original order.\n");
         printf("2.View incidents sorted by severity.\n");
-        // printf("2.View incidents sorted by date and time.\n");
+        printf("3.View incidents sorted by date and time.\n");
         printf("4.Exit\n");
 
-        printf("enter your choice:");
+        printf("enter your choice:\n");
         scanf("%d",&ch);
         switch(ch)
         {
             case 1:
             view_all_incident_normally();
-            break;
+            return;
             case 2:
             view_incidents_according_to_severity();
-            break;
+            return;
 
             case 3:
+            view_incidents_from_date();
+            return;
+            case 4:
             return;
             default:
             printf("invalid number.");
+            return;
 
         }
     }
@@ -336,6 +437,87 @@ void search_keywords()
     fclose(fp);
 }
 
+void searchIncidentByID() {
+    char searchID[10], line[256];
+    int found = 0;
+    printf("Enter Incident ID: ");
+    fgets(searchID, sizeof(searchID), stdin);
+    searchID[strcspn(searchID, "\n")] = 0; // remove newline
+
+    FILE *file = fopen("incidents.txt", "r");
+    if (!file) {
+        printf("No incidents found.\n");
+        return;
+    }
+
+    while (fgets(line, sizeof(line), file)) {
+        if (strstr(line, searchID)) {
+            found = 1;
+            printf("%s", line);
+            // Print remaining lines until next "ID:" or EOF
+            while (fgets(line, sizeof(line), file) && !strstr(line, "ID:")) {
+                printf("%s", line);
+            }
+            break;
+        }
+    }
+
+    if (!found) printf("Incident not found.\n");
+    fclose(file);
+}
+
+void searchIncidentByTitle() {
+    char searchTitle[100], line[256];
+    int found = 0;
+    printf("Enter Incident Title: ");
+    fgets(searchTitle, sizeof(searchTitle), stdin);
+    searchTitle[strcspn(searchTitle, "\n")] = 0;
+
+    FILE *file = fopen("incidents.txt", "r");
+    if (!file) {
+        printf("No incidents found.\n");
+        return;
+    }
+
+    while (fgets(line, sizeof(line), file)) {
+        if (strstr(line, searchTitle)) {
+            found = 1;
+            // Move back to print ID too
+            printf("%s", line);
+            while (fgets(line, sizeof(line), file) && !strstr(line, "ID:")) {
+                printf("%s", line);
+            }
+        }
+    }
+
+    if (!found) printf("Incident not found.\n");
+    fclose(file);
+}
+
+
+void search_incident() {
+    int incident_number;
+    printf("\n\n. Search incident by ID\n");
+    printf("2. Search incident by title\n");
+    printf("3. Exit\n");
+    printf("\nEnter incident number to search: \n");
+    scanf("%d", &incident_number);
+    switch(incident_number) {
+        case 1:
+            searchIncidentByID();
+            return;
+        case 2:
+            searchIncidentByTitle();
+            return;
+        case 3:
+            return;
+        default:
+            printf("Invalid incident number.\n");
+            return;
+    }
+}
+
+
 int main()
 {
     while(1) 
@@ -344,6 +526,7 @@ int main()
         printf("1. Add Incident\n");
         printf("2. View Incidents\n");
         printf("3. Search a keyword\n");
+        printf("3. Search Incident\n");
         printf("4. Exit\n");
         int choice;
         printf("enter your choice:");
@@ -363,6 +546,9 @@ int main()
             case 4:
                 printf("Exiting...\n");
                 exit(0);
+            case 5:
+                search_incident();
+                break;
             default:
                 printf("Invalid choice. Please try again.\n");
         }
