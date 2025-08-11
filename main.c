@@ -526,8 +526,8 @@ int main()
         printf("1. Add Incident\n");
         printf("2. View Incidents\n");
         printf("3. Search a keyword\n");
-        printf("3. Search Incident\n");
-        printf("4. Exit\n");
+        printf("4. Search Incident\n");
+        printf("5. Exit\n");
         int choice;
         printf("enter your choice:");
         scanf("%d", &choice);
@@ -543,10 +543,10 @@ int main()
             case 3:
                 search_keywords();
                 break;
-            case 4:
+            case 5:
                 printf("Exiting...\n");
                 exit(0);
-            case 5:
+            case 4:
                 search_incident();
                 break;
             default:
