@@ -84,6 +84,7 @@ void incident_severity_and_status(struct Incident *incident) {
     printf("1. Low\n2. Medium\n3. High\n4. Critical\n");
     printf("Enter severity number: ");
     scanf("%d", &severity_choice);
+    while(getchar() != '\n'); 
 
     if (severity_choice == 1)
         strcpy(incident->severity, "Low");
@@ -182,17 +183,21 @@ void addIncident()
     }
     // newIncident.id=get_next_id();
     printf("Enter title: ");
-    scanf("%[^\n]", newIncident.title);
+    fgets(newIncident.title, sizeof(newIncident.title), stdin);
+    newIncident.title[strcspn(newIncident.title, "\n")] = 0; // remove newline
+
     printf("Enter description: ");
-    scanf(" %[^\n]", newIncident.description); 
-    getchar();
+    fgets(newIncident.description, sizeof(newIncident.description), stdin);
+    newIncident.description[strcspn(newIncident.description, "\n")] = 0;
     time_t now=time(NULL);
     struct tm *t = localtime(&now);
     strftime(newIncident.datetime, sizeof(newIncident.datetime), "%Y-%m-%d %H:%M:%S", t);
     printf("Enter reported by: ");
-    scanf("%[^\n]", newIncident.reportedBy);
+    fgets(newIncident.reportedBy, sizeof(newIncident.reportedBy), stdin);
+    newIncident.reportedBy[strcspn(newIncident.reportedBy, "\n")]=0;
     printf("Enter category: ");
-    scanf(" %[^\n]", newIncident.category); // Clear the newline character from the input buffer
+    fgets(newIncident.category, sizeof(newIncident.category), stdin);
+    newIncident.category[strcspn(newIncident.category, "\n")] = 0;
 
     fprintf(fp,"ID: %s\n",newIncident.id);
     fprintf(fp, "Date & time: %s\n", newIncident.datetime);
